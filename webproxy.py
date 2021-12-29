@@ -3,7 +3,8 @@ from bs4 import BeautifulSoup
 import zlib
 from urllib.parse import urlparse, urljoin
 from base64 import b64encode
-from threading import Thread
+from multiprocessing import Pool
+from multiprocessing import cpu_count
 
 threads = []
 
@@ -22,35 +23,41 @@ def lambda_handler(event, context):
     pagesoup = BeautifulSoup(requested_page.text, "lxml")
     parsed_uri = urlparse(page_url)
     domain = '{uri.scheme}://{uri.netloc}/'.format(uri=parsed_uri)
+
+    pool = Pool(cpu_count())
+
     for form in pagesoup.findAll('form'):
         if form['action'].startswith('/'):
             form['action'] = urljoin(domain, form['action'])
-    for img in pagesoup.findAll('img'):
-        if img.has_attr('src'):
-            if img['src'].startswith('/'):
-                img['src'] = urljoin(domain, img['src'])
-            thread = Thread(target=get_url_content, args=(img['src'], session, headers, img))
-            threads.append(thread)
-    for link in pagesoup.findAll('link'):
-        if link['rel'] == "stylesheet" and link.has_attr('href'):
-            if link['href'].startswith('/'):
-                link['href'] = urljoin(domain, link['href'])
-            thread = Thread(target=get_url_content, args=(link['href'], session, headers, pagesoup.head.style))
-            threads.append(thread)
+
+    img_with_srcs = [img for img in pagesoup.findAll('img') if img.has_attr('src')]
+    for img in img_with_srcs:
+        if img['src'].startswith('/'):
+            img['src'] = urljoin(domain, img['src'])
+
+    img_with_srcs_parameters = [(img['src'], session, headers, img) for img in img_with_srcs]
+    pool.map(get_url_content, img_with_srcs_parameters)
+
+    link_with_css_hrefs = [link for link in pagesoup.findAll('link') if link['rel'] == "stylesheet" and link.has_attr('href')]
+    for link in link_with_css_hrefs:
+        if link['href'].startswith('/'):
+            link['href'] = urljoin(domain, link['href'])
         else:
             link['href'] = ''
-    for script in pagesoup.findAll('script'):
-        if script.has_attr('src'):
-            if script['src'].startswith('/'):
-                script['src'] = urljoin(domain, script['src'])
-            thread = Thread(target=get_url_content, args=(script['src'], session, headers, pagesoup.head.script))
-            threads.append(thread)
 
-    for thread in threads:
-        thread.start()
+    link_with_css_hrefs_parameters = [(link['href'], session, headers, pagesoup.head.style) for link in link_with_css_hrefs]
+    pool.map(get_url_content, link_with_css_hrefs_parameters)
 
-    for thread in threads:
-        thread.join()
+    script_with_srcs = [script for script in pagesoup.findAll('script') if script.has_attr('src')]
+    for script in script_with_srcs:
+        if script['src'].startswith('/'):
+            script['src'] = urljoin(domain, script['src'])
+
+    script_with_srcs_parameters = [(script[src], session, headers, pagesoup.head.script) for script in script_with_srcs]
+    pool.map(get_url_content, script_with_srcs_parameters)
+
+    pool.close()
+    pool.join()
 
     session.close()
 
