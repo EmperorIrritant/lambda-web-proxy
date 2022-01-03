@@ -13,14 +13,15 @@ def lambda_handler(event, context):
     parsed_uri = urlparse(page_url)
     domain = '{uri.scheme}://{uri.netloc}/'.format(uri=parsed_uri)
     for form in pagesoup.findAll('form'):
-        if form['action'].startswith('/'):
-            form['action'] = urljoin(domain, form['action'])
+        if form.has_attr('action'):
+            if form['action'].startswith('/'):
+                form['action'] = urljoin(domain, form['action'])
     for img in pagesoup.findAll('img'):
         if img.has_attr('src'):
             if img['src'].startswith('/'):
                 img['src'] = urljoin(domain, img['src'])
             image = session.get(img['src'], headers=headers)
-            img['src'] = f"data:{image.headers['Content-Type']},base64,{b64encode(image)}"
+            img['src'] = f"data:{image.headers['Content-Type']},base64,{b64encode(image.content)}"
     for link in pagesoup.findAll('link'):
         if link['rel'] == "stylesheet" and link.has_attr('href'):
             if link['href'].startswith('/'):
@@ -34,7 +35,14 @@ def lambda_handler(event, context):
             if script['src'].startswith('/'):
                 script['src'] = urljoin(domain, script['src'])
             js = session.get(script['src'], headers=headers)
-            pagesoup.head.script.append(js.text)
+            if pagesoup.head.findChild('script'):
+                pagesoup.head.script.append(js.text)
+            else:
+                script = pagesoup.new_tag("script")
+                script.append(js.text)
+                pagesoup.head.append(script)
+            script['src'] = ''
     session.close()
 
     return b64encode(zlib.compress(str(pagesoup).encode('utf-8')))
+
