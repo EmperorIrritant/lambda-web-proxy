@@ -18,10 +18,10 @@
             function getPageFromLambda() {
                 var url = $("#submit-btn").val();
                 var lambdaParams = {
-                FunctionName: 'webproxy',
-                InvocationType: 'RequestResponse',
-                Payload: JSON.stringify({"request": {"page_url": url}}),
-                LogType: 'None'
+                    FunctionName: 'webproxy',
+                    InvocationType: 'RequestResponse',
+                    Payload: JSON.stringify({"request": {"page_url": url}}),
+                    LogType: 'None'
                 };
 
                 Lambda.invoke(lambdaParams,  function(err, data) {
@@ -34,17 +34,17 @@
                 });
             }
 
-            var charData, binData, data, strData;
-            function parseAndDisplay(response_) {
-                var response = atob(response_)
-                charData = new Array(response.length);
-                for (i = 0, il = response.length; i < il; ++i) {
-                    charData[i] = response.charCodeAt(i);
+            function parseAndDisplay(data) {
+                var decoded = atob(data)
+                var charData = new Array(decoded.length);
+                for (i = 0, il = decoded.length; i < il; ++i) {
+                    charData[i] = decoded.charCodeAt(i);
                 }
-                binData     = new Uint8Array(charData);
-                data        = pako.inflate(binData);
+                var binData = new Uint8Array(charData);
+                var decompressedData = pako.inflate(binData);
                 //strData     = String.fromCharCode.apply(null, new Uint16Array(data));
-                for (b of data) strData += String.fromCharCode(b);
+                var strData = "";
+                for (b of decompressedData) strData += String.fromCharCode(b);
                 document.querySelector("iframe").srcdoc = strData;
             }
         </script>
