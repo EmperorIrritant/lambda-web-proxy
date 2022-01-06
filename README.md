@@ -1,6 +1,5 @@
 # lambda-web-proxy
-A web proxy using AWS Lambda. All HTTP(S) calls will be replaced with Lambda calls, so connection reuse may not be possible.
+A web proxy using AWS Lambda. Currently, resources are fetched on the Lambda function and included in the webpage, which does not work with many websites.
 
-# Project Status
-
-- Server side page processing needs to be rewritten
+# TODO
+- AWS Deployment
